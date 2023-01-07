@@ -107,6 +107,10 @@
           {
             "title": "Storage",
             "path": "concepts/plugins/csi"
+          },
+          {
+            "title": "Networking",
+            "path": "concepts/plugins/cni"
           }
         ]
       },
@@ -235,6 +239,56 @@
           {
             "title": "bootstrap",
             "path": "commands/acl/bootstrap"
+          },
+          {
+            "title": "auth-method",
+            "routes": [
+              {
+                "title": "create",
+                "path": "commands/acl/auth-method/create"
+              },
+              {
+                "title": "delete",
+                "path": "commands/acl/auth-method/delete"
+              },
+              {
+                "title": "info",
+                "path": "commands/acl/auth-method/info"
+              },
+              {
+                "title": "list",
+                "path": "commands/acl/auth-method/list"
+              },
+              {
+                "title": "update",
+                "path": "commands/acl/auth-method/update"
+              }
+            ]
+          },
+          {
+            "title": "binding-rule",
+            "routes": [
+              {
+                "title": "create",
+                "path": "commands/acl/binding-rule/create"
+              },
+              {
+                "title": "delete",
+                "path": "commands/acl/binding-rule/delete"
+              },
+              {
+                "title": "info",
+                "path": "commands/acl/binding-rule/info"
+              },
+              {
+                "title": "list",
+                "path": "commands/acl/binding-rule/list"
+              },
+              {
+                "title": "update",
+                "path": "commands/acl/binding-rule/update"
+              }
+            ]
           },
           {
             "title": "policy",
@@ -1792,6 +1846,27 @@
       {
         "title": "Variable Interpolation",
         "path": "runtime/interpolation"
+      }
+    ]
+  },
+  {
+    "title": "Networking",
+    "routes": [
+      {
+        "title": "Overview",
+        "path": "networking"
+      },
+      {
+        "title": "Service Discovery",
+        "path": "networking/service-discovery"
+      },
+      {
+        "title": "Service Mesh",
+        "path": "networking/service-mesh"
+      },
+      {
+        "title": "CNI",
+        "path": "networking/cni"
       }
     ]
   },

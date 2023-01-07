@@ -392,6 +392,11 @@ func (s *HTTPServer) registerHandlers(enableDebug bool) {
 	s.mux.HandleFunc("/v1/acl/auth-method", s.wrap(s.ACLAuthMethodRequest))
 	s.mux.HandleFunc("/v1/acl/auth-method/", s.wrap(s.ACLAuthMethodSpecificRequest))
 
+	// Register our ACL binding rule handlers.
+	s.mux.HandleFunc("/v1/acl/binding-rules", s.wrap(s.ACLBindingRuleListRequest))
+	s.mux.HandleFunc("/v1/acl/binding-rule", s.wrap(s.ACLBindingRuleRequest))
+	s.mux.HandleFunc("/v1/acl/binding-rule/", s.wrap(s.ACLBindingRuleSpecificRequest))
+
 	s.mux.Handle("/v1/client/fs/", wrapCORS(s.wrap(s.FsRequest)))
 	s.mux.HandleFunc("/v1/client/gc", s.wrap(s.ClientGCRequest))
 	s.mux.Handle("/v1/client/stats", wrapCORS(s.wrap(s.ClientStatsRequest)))
@@ -778,10 +783,20 @@ func parseWait(resp http.ResponseWriter, req *http.Request, b *structs.QueryOpti
 }
 
 // parseConsistency is used to parse the ?stale query params.
-func parseConsistency(req *http.Request, b *structs.QueryOptions) {
+func parseConsistency(resp http.ResponseWriter, req *http.Request, b *structs.QueryOptions) {
 	query := req.URL.Query()
-	if _, ok := query["stale"]; ok {
-		b.AllowStale = true
+	if staleVal, ok := query["stale"]; ok {
+		if len(staleVal) == 0 || staleVal[0] == "" {
+			b.AllowStale = true
+			return
+		}
+		staleQuery, err := strconv.ParseBool(staleVal[0])
+		if err != nil {
+			resp.WriteHeader(400)
+			_, _ = resp.Write([]byte(fmt.Sprintf("Expect `true` or `false` for `stale` query string parameter, got %s", staleVal[0])))
+			return
+		}
+		b.AllowStale = staleQuery
 	}
 }
 
@@ -879,7 +894,7 @@ func (s *HTTPServer) parseToken(req *http.Request, token *string) {
 func (s *HTTPServer) parse(resp http.ResponseWriter, req *http.Request, r *string, b *structs.QueryOptions) bool {
 	s.parseRegion(req, r)
 	s.parseToken(req, &b.AuthToken)
-	parseConsistency(req, b)
+	parseConsistency(resp, req, b)
 	parsePrefix(req, b)
 	parseNamespace(req, &b.Namespace)
 	parsePagination(req, b)

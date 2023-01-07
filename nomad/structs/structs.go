@@ -119,6 +119,8 @@ const (
 	ACLRolesDeleteByIDRequestType                MessageType = 54
 	ACLAuthMethodsUpsertRequestType              MessageType = 55
 	ACLAuthMethodsDeleteRequestType              MessageType = 56
+	ACLBindingRulesUpsertRequestType             MessageType = 57
+	ACLBindingRulesDeleteRequestType             MessageType = 58
 
 	// Namespace types were moved from enterprise and therefore start at 64
 	NamespaceUpsertRequestType MessageType = 64
@@ -293,6 +295,8 @@ type QueryOptions struct {
 	// Reverse is used to reverse the default order of list results.
 	Reverse bool
 
+	identity *AuthenticatedIdentity
+
 	InternalRpcInfo
 }
 
@@ -337,6 +341,14 @@ func (q QueryOptions) IsRead() bool {
 
 func (q QueryOptions) AllowStaleRead() bool {
 	return q.AllowStale
+}
+
+func (q *QueryOptions) SetIdentity(identity *AuthenticatedIdentity) {
+	q.identity = identity
+}
+
+func (q QueryOptions) GetIdentity() *AuthenticatedIdentity {
+	return q.identity
 }
 
 // AgentPprofRequest is used to request a pprof report for a given node.
@@ -399,6 +411,8 @@ type WriteRequest struct {
 	// IdempotencyToken can be used to ensure the write is idempotent.
 	IdempotencyToken string
 
+	identity *AuthenticatedIdentity
+
 	InternalRpcInfo
 }
 
@@ -433,6 +447,41 @@ func (w WriteRequest) IsRead() bool {
 
 func (w WriteRequest) AllowStaleRead() bool {
 	return false
+}
+
+func (w *WriteRequest) SetIdentity(identity *AuthenticatedIdentity) {
+	w.identity = identity
+}
+
+func (w WriteRequest) GetIdentity() *AuthenticatedIdentity {
+	return w.identity
+}
+
+// AuthenticatedIdentity is returned by the Authenticate method on server to
+// return a wrapper around the various elements that can be resolved as an
+// identity. RPC handlers will use the relevant fields for performing
+// authorization.
+type AuthenticatedIdentity struct {
+	ACLToken *ACLToken
+	Claims   *IdentityClaims
+	ClientID string
+	ServerID string
+	TLSName  string
+	RemoteIP net.IP
+}
+
+func (ai *AuthenticatedIdentity) GetACLToken() *ACLToken {
+	if ai == nil {
+		return nil
+	}
+	return ai.ACLToken
+}
+
+func (ai *AuthenticatedIdentity) GetClaims() *IdentityClaims {
+	if ai == nil {
+		return nil
+	}
+	return ai.Claims
 }
 
 // QueryMeta allows a query response to include potentially
@@ -613,6 +662,10 @@ type JobRegisterRequest struct {
 
 	// Eval is the evaluation that is associated with the job registration
 	Eval *Evaluation
+
+	// Deployment is the deployment to be create when the job is registered. If
+	// there is an active deployment for the job it will be canceled.
+	Deployment *Deployment
 
 	WriteRequest
 }
@@ -9216,14 +9269,15 @@ func (v *Vault) Validate() error {
 
 const (
 	// DeploymentStatuses are the various states a deployment can be be in
-	DeploymentStatusRunning    = "running"
-	DeploymentStatusPaused     = "paused"
-	DeploymentStatusFailed     = "failed"
-	DeploymentStatusSuccessful = "successful"
-	DeploymentStatusCancelled  = "cancelled"
-	DeploymentStatusPending    = "pending"
-	DeploymentStatusBlocked    = "blocked"
-	DeploymentStatusUnblocking = "unblocking"
+	DeploymentStatusRunning      = "running"
+	DeploymentStatusPaused       = "paused"
+	DeploymentStatusFailed       = "failed"
+	DeploymentStatusSuccessful   = "successful"
+	DeploymentStatusCancelled    = "cancelled"
+	DeploymentStatusInitializing = "initializing"
+	DeploymentStatusPending      = "pending"
+	DeploymentStatusBlocked      = "blocked"
+	DeploymentStatusUnblocking   = "unblocking"
 
 	// TODO Statuses and Descriptions do not match 1:1 and we sometimes use the Description as a status flag
 
@@ -9357,7 +9411,8 @@ func (d *Deployment) Copy() *Deployment {
 // Active returns whether the deployment is active or terminal.
 func (d *Deployment) Active() bool {
 	switch d.Status {
-	case DeploymentStatusRunning, DeploymentStatusPaused, DeploymentStatusBlocked, DeploymentStatusUnblocking, DeploymentStatusPending:
+	case DeploymentStatusRunning, DeploymentStatusPaused, DeploymentStatusBlocked,
+		DeploymentStatusUnblocking, DeploymentStatusInitializing, DeploymentStatusPending:
 		return true
 	default:
 		return false
@@ -12079,6 +12134,14 @@ var (
 		Type:       ACLClientToken,
 		Policies:   []string{"anonymous"},
 		Global:     false,
+	}
+
+	// LeaderACLToken is used to represent a leader's own token; this object
+	// never gets used except on the leader
+	LeaderACLToken = &ACLToken{
+		AccessorID: "leader",
+		Name:       "Leader Token",
+		Type:       ACLManagementToken,
 	}
 )
 
